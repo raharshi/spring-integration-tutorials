@@ -1,5 +1,9 @@
 package com.spring.spring_integration_tutorials.service;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.integration.annotation.Poller;
 import org.springframework.integration.annotation.ServiceActivator;
@@ -9,18 +13,12 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.stereotype.Service;
 
-import com.spring.spring_integration_tutorials.model.Order;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring.spring_integration_tutorials.model.RequestDto;
 
 @Service
 public class FileReadService {
 
-    // @Bean(name = "process-order-channel")
-    // public MessageChannel processOrderchannel(){
-    //     /*By default spring integration uses direct channel 
-    //     if we want to create a different channel we can use this process */
-    //     return new DirectChannel();
-    // }
 
     @Bean(name="process-data-channel")
     public MessageChannel processChannel(){
@@ -38,7 +36,26 @@ public class FileReadService {
 
     @ServiceActivator(inputChannel = "process-data-channel", outputChannel = "reply-channel", poller = @Poller(fixedDelay = "100",maxMessagesPerPoll = "1"))
     public Message<RequestDto> processData(Message<RequestDto> request){
-        request.getPayload().setStatus("Request placed successfully!!");
+            String filePath = request.getPayload().getFilePath();
+            File file = new File(filePath);
+            
+            if (file.exists() && file.isFile()) {
+                try {
+                    // Read file content as a JSON string
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    Object data = objectMapper.readValue(file, Object.class);
+
+                    // String jsonData = Files.readString(Paths.get(filePath));
+                    request.getPayload().setData(data);
+                    request.getPayload().setStatus("Request placed successfully!!");
+                } catch (Exception e) {
+                    throw new RuntimeException("Error reading file: " + e.getMessage());
+                }
+            } else {
+                // throw new RuntimeException("File not found or invalid path: " + filePath);
+                request.getPayload().setStatus("Request Failed!!");
+            }
+            
         return request;
     }
 
